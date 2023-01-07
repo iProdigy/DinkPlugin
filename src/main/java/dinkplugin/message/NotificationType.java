@@ -23,9 +23,13 @@ public enum NotificationType {
 
     private final String title;
 
-    // Name of the screenshot file
+    /**
+     * Name of the screenshot file
+     */
     private final String screenshot;
 
-    // Link to the notifier icon
+    /**
+     * Link to the notifier icon
+     */
     private final String thumbnail;
 }
