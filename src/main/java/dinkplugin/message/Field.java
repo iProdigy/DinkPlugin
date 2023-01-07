@@ -6,6 +6,8 @@ import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+// Describes a Discord rich embed field
+// https://birdie0.github.io/discord-webhooks-guide/structure/embed/fields.html
 @Value
 @Builder
 @AllArgsConstructor
