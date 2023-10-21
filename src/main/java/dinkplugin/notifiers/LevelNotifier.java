@@ -121,6 +121,11 @@ public class LevelNotifier extends BaseNotifier {
             return;
         }
 
+        if (level < MAX_REAL_LEVEL && level < previousLevel) {
+            // avoid LevelNotifier#reset for depletable skills like hp, prayer
+            virtualLevel = getLevel(xp);
+        }
+
         if (virtualLevel < previousLevel) {
             // base skill level should never regress; reset notifier state
             reset();
