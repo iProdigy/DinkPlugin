@@ -110,6 +110,7 @@ public class DinkPlugin extends Plugin {
         clueNotifier.reset();
         diaryNotifier.reset();
         levelNotifier.reset();
+        deathNotifier.reset();
         slayerNotifier.reset();
         killCountNotifier.reset();
         groupStorageNotifier.reset();
@@ -182,6 +183,7 @@ public class DinkPlugin extends Plugin {
         clueNotifier.onTick();
         slayerNotifier.onTick();
         levelNotifier.onTick();
+        deathNotifier.onTick();
         combatTaskNotifier.onTick();
         diaryNotifier.onTick();
         killCountNotifier.onTick();

@@ -23,6 +23,7 @@ import net.runelite.api.ParamID;
 import net.runelite.api.Player;
 import net.runelite.api.Prayer;
 import net.runelite.api.Varbits;
+import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
 import net.runelite.client.game.ItemManager;
@@ -57,6 +58,8 @@ public class DeathNotifier extends BaseNotifier {
     private static final String ATTACK_OPTION = "Attack";
 
     private static final String TOA_DEATH_MSG = "You failed to survive the Tombs of Amascut";
+
+    private static final String LEAGUES_RELIC_MSG = "Your Undying Retribution Relic saves your life.";
 
     /**
      * Checks whether the actor is alive and interacting with the specified player.
@@ -96,6 +99,8 @@ public class DeathNotifier extends BaseNotifier {
      */
     private WeakReference<Actor> lastTarget = new WeakReference<>(null);
 
+    private volatile boolean notifQueued = false;
+
     @Override
     public boolean isEnabled() {
         return config.notifyDeath() && super.isEnabled();
@@ -106,11 +111,20 @@ public class DeathNotifier extends BaseNotifier {
         return config.deathWebhook();
     }
 
+    public void reset() {
+        this.notifQueued = false;
+    }
+
     public void onActorDeath(ActorDeath actor) {
         boolean self = client.getLocalPlayer() == actor.getActor();
 
-        if (self && isEnabled())
-            handleNotify(null);
+        if (self && isEnabled()) {
+            if (shouldDelayForLeagueRelic()) {
+                this.notifQueued = true;
+            } else {
+                handleNotify(null);
+            }
+        }
 
         if (self || actor.getActor() == lastTarget.get())
             lastTarget = new WeakReference<>(null);
@@ -122,6 +136,17 @@ public class DeathNotifier extends BaseNotifier {
             // https://github.com/pajlads/DinkPlugin/issues/316
             // though, hardcore (group) ironmen just use the normal ActorDeath trigger for TOA
             handleNotify(Danger.DANGEROUS);
+        }
+
+        if (shouldDelayForLeagueRelic() && message.contains(LEAGUES_RELIC_MSG)) {
+            this.notifQueued = false;
+        }
+    }
+
+    public void onTick() {
+        if (notifQueued) {
+            handleNotify(null);
+            this.notifQueued = false;
         }
     }
 
@@ -234,6 +259,13 @@ public class DeathNotifier extends BaseNotifier {
         if (client.isPrayerActive(Prayer.PROTECT_ITEM))
             keepCount++;
         return keepCount;
+    }
+
+    private boolean shouldDelayForLeagueRelic() {
+        return !config.leaguesRetributionDeath() &&
+            client.getVarbitValue(17302) == 2 &&
+            client.getWorldType().contains(WorldType.SEASONAL) &&
+            client.getVarbitValue(Varbits.IN_RAID) <= 0;
     }
 
     /**

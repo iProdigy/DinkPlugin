@@ -1777,4 +1777,15 @@ public interface DinkPluginConfig extends Config {
         return LeagueTaskDifficulty.EASY;
     }
 
+    @ConfigItem(
+        keyName = "leaguesRetributionDeath",
+        name = "Undying Retribution Deaths",
+        description = "Whether fake deaths from 'Undying Retribution' T8 relic should trigger death notifications",
+        position = 206,
+        section = leaguesSection
+    )
+    default boolean leaguesRetributionDeath() {
+        return true;
+    }
+
 }
