@@ -26,6 +26,7 @@ import net.runelite.api.Varbits;
 import net.runelite.api.WorldType;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.InteractingChanged;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.NPCManager;
 import org.apache.commons.lang3.ArrayUtils;
@@ -82,6 +83,9 @@ public class DeathNotifier extends BaseNotifier {
     private static final Function<Player, Comparator<Player>> PK_COMPARATOR;
 
     @Inject
+    private ClientThread clientThread;
+
+    @Inject
     private ItemManager itemManager;
 
     @Inject
@@ -136,17 +140,20 @@ public class DeathNotifier extends BaseNotifier {
             // https://github.com/pajlads/DinkPlugin/issues/316
             // though, hardcore (group) ironmen just use the normal ActorDeath trigger for TOA
             handleNotify(Danger.DANGEROUS);
-        }
-
-        if (shouldDelayForLeagueRelic() && message.contains(LEAGUES_RELIC_MSG)) {
+        } else if (shouldDelayForLeagueRelic() && message.contains(LEAGUES_RELIC_MSG)) {
             this.notifQueued = false;
         }
     }
 
     public void onTick() {
         if (notifQueued) {
-            handleNotify(null);
-            this.notifQueued = false;
+            // delay to ensure chat messages have been processed
+            clientThread.invokeLater(() -> {
+                if (notifQueued) {
+                    handleNotify(null);
+                    this.notifQueued = false;
+                }
+            });
         }
     }
 
