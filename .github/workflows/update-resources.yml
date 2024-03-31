@@ -1,7 +1,7 @@
 name: Update Resources
 on:
   schedule:
-    - cron: "0 21 * * *"
+    - cron: "45 20 * * *"
 
 jobs:
   update-resources:
