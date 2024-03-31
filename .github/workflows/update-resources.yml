@@ -1,7 +1,8 @@
 name: Update Resources
 on:
   schedule:
-    - cron: "10 21 * * *"
+    - cron: "0 4 * * *"
+  workflow_dispatch:
 
 jobs:
   update-resources:
