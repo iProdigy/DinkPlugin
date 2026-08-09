@@ -5,6 +5,7 @@ import dinkplugin.message.NotificationType;
 import dinkplugin.message.templating.Replacements;
 import dinkplugin.message.templating.Template;
 import dinkplugin.notifiers.data.PetNotificationData;
+import dinkplugin.util.RaidTracker;
 import dinkplugin.util.ItemSearcher;
 import dinkplugin.util.ItemUtils;
 import dinkplugin.util.KillCountService;
@@ -76,6 +77,9 @@ public class PetNotifier extends BaseNotifier {
 
     @Inject
     private ItemSearcher itemSearcher;
+
+    @Inject
+    private RaidTracker raidTracker;
 
     @Inject
     private KillCountService killCountService;
@@ -233,7 +237,7 @@ public class PetNotifier extends BaseNotifier {
             .orElse(null);
 
         Source source = petName != null ? PET_NAMES_TO_SOURCE.get(pet) : null;
-        Double rarity = source != null ? source.getProbability(client, killCountService) : null;
+        Double rarity = source != null ? source.getProbability(client, killCountService, raidTracker) : null;
         Integer actions = rarity != null ? source.estimateActions(client, killCountService) : null;
         Double luck = actions != null && (previouslyOwned != null && !previouslyOwned)
             ? source.calculateLuck(client, killCountService, rarity, actions) : null;
@@ -273,7 +277,7 @@ public class PetNotifier extends BaseNotifier {
     }
 
     private static abstract class Source {
-        abstract Double getProbability(Client client, KillCountService kcService);
+        abstract Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker);
 
         abstract Integer estimateActions(Client client, KillCountService kcService);
 
@@ -294,7 +298,7 @@ public class PetNotifier extends BaseNotifier {
         }
 
         @Override
-        Double getProbability(Client client, KillCountService kcService) {
+        Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
             final int[] actions = getActions(client, kcService);
             if (actions == null) return null;
             final int totalActions = MathUtils.sum(actions);
@@ -368,7 +372,7 @@ public class PetNotifier extends BaseNotifier {
         Double probability;
 
         @Override
-        Double getProbability(Client client, KillCountService kcService) {
+        Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
             return this.probability;
         }
 
@@ -413,7 +417,7 @@ public class PetNotifier extends BaseNotifier {
             entry("Abyssal orphan", new KcSource("Abyssal Sire", 1.0 / 2_560)),
             entry("Abyssal protector", new Source() {
                 @Override
-                Double getProbability(Client client, KillCountService kcService) {
+                Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
                     return 1.0 / 4_000;
                 }
 
@@ -521,39 +525,8 @@ public class PetNotifier extends BaseNotifier {
             entry("Noon", new KcSource("Grotesque Guardians", 1.0 / 3_000)),
             entry("Olmlet", new Source() {
                 @Override
-                Double getProbability(Client client, KillCountService kcService) {
-                    // https://oldschool.runescape.wiki/w/Ancient_chest#Unique_drop_table
-                    int totalPoints = client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSCORE); // assume representative
-                    if (totalPoints <= 0) {
-                        totalPoints = 26_025;
-                    }
-
-                    final double uniqueDropPetRate = 1.0 / 53; // likelihood of a pet drop from a successful unique roll
-                    final int maxPointsPerRoll = 570_000; // "chance is capped at 65.7% (570,000 points) - any further points will be sent to roll for a second unique loot"
-                    final double pointsPerPct = 867_600; // "For every 8,676 total points obtained, a 1% chance to obtain a unique loot is given"
-                    final double rarityForMaxRoll = (maxPointsPerRoll / pointsPerPct) * uniqueDropPetRate; // 1.2% is pet chance for unique roll with max points
-                    int numMaxRolls = Math.min(totalPoints / maxPointsPerRoll, 6); // "Up to six unique rewards can be obtained per raid"
-                    int lastRollPoints = totalPoints % maxPointsPerRoll; // remaining points for a non-max unique roll
-                    double lastRollProb = (lastRollPoints / pointsPerPct) * uniqueDropPetRate; // Prob(unique) * P(pet | unique) = P(pet)
-
-                    // Similar to cumulative geometric: 1 - Prob(all rolls failed to produce a unique) = Prob(at least one unique)
-                    double partyProbability = 1 - Math.pow(1 - rarityForMaxRoll, numMaxRolls) * (1 - lastRollProb);
-
-                    // Party adjustment: pet is more likely to be allocated to players with greater points
-                    double weight;
-                    int partySize = client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSIZE);
-                    if (partySize > 1) {
-                        int personalPoints = client.getVarpValue(VarPlayerID.RAIDS_PLAYERSCORE);
-                        if (personalPoints <= 0) {
-                            personalPoints = totalPoints / partySize;
-                        }
-                        weight = 1.0 * personalPoints / totalPoints;
-                    } else {
-                        weight = 1;
-                    }
-
-                    // Prob(party rolls a pet) * P(local player gets pet | party rolls a pet) = P(local player gets pet)
-                    return partyProbability * weight;
+                Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
+                    return raidTracker.getXericPetProbability();
                 }
 
                 @Override
@@ -576,7 +549,7 @@ public class PetNotifier extends BaseNotifier {
             entry("Pet kraken", new KcSource("Kraken", 1.0 / 3_000)),
             entry("Pet penance queen", new Source() {
                 @Override
-                Double getProbability(Client client, KillCountService kcService) {
+                Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
                     return 1.0 / 1_000;
                 }
 
@@ -600,7 +573,7 @@ public class PetNotifier extends BaseNotifier {
             entry("Smolcano", new KcSource("Zalcano", 1.0 / 2_250)),
             entry("Smol heredit", new Source() {
                 @Override
-                Double getProbability(Client client, KillCountService kcService) {
+                Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
                     return 1.0 / 200;
                 }
 
@@ -643,13 +616,9 @@ public class PetNotifier extends BaseNotifier {
             entry("Tiny tempor", new KcSource("Reward pool (Tempoross)", 1.0 / 8_000)),
             entry("Tumeken's guardian", new Source() {
                 @Override
-                Double getProbability(Client client, KillCountService kcService) {
-                    // https://oldschool.runescape.wiki/w/Chest_(Tombs_of_Amascut)#Tertiary_rewards
-                    int rewardPoints = client.getVarbitValue(VarbitID.RAIDS_CLIENT_PARTYSCORE);
-                    int raidLevels = Math.min(client.getVarbitValue(VarbitID.TOA_CLIENT_RAID_LEVEL), 550);
-                    int x = Math.min(raidLevels, 400);
-                    int y = Math.max(raidLevels - 400, 0);
-                    return 0.01 * rewardPoints / (350_000 - 700 * (x + y / 3.0)); // assume latest is representative
+                Double getProbability(Client client, KillCountService kcService, RaidTracker raidTracker) {
+                    double prob = raidTracker.getAmascutPetProbability();
+                    return prob > 0 ? prob : null;
                 }
 
                 @Override
